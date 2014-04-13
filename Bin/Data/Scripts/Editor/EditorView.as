@@ -16,6 +16,7 @@ int  viewportBorderWidth = 4; // width of a viewport resize border
 IntRect viewportArea; // the area where the editor viewport is. if we ever want to have the viewport not take up the whole screen this abstracts that
 IntRect viewportUIClipBorder = IntRect(27, 60, 0, 0); // used to clip viewport borders, the borders are ugly when going behind the transparent toolbars
 bool mouseWheelCameraPosition = false;
+bool contextMenuActionWaitFrame = false;
 
 const uint VIEWPORT_BORDER_H     = 0x00000001;
 const uint VIEWPORT_BORDER_H1    = 0x00000002;
@@ -404,6 +405,7 @@ void CreateCamera()
     SubscribeToEvent("PostRenderUpdate", "HandlePostRenderUpdate");
     SubscribeToEvent("UIMouseClick", "ViewMouseClick");
     SubscribeToEvent("MouseMove", "ViewMouseMove");
+    SubscribeToEvent("UIMouseClickEnd", "ViewMouseClickEnd");
     SubscribeToEvent("BeginViewUpdate", "HandleBeginViewUpdate");
     SubscribeToEvent("EndViewUpdate", "HandleEndViewUpdate");
     SubscribeToEvent("BeginViewRender", "HandleBeginViewRender");
@@ -1355,7 +1357,8 @@ void DrawNodeDebug(Node@ node, DebugRenderer@ debug, bool drawNode = true)
 void ViewMouseMove()
 {
     // setting mouse position based on mouse position
-    if (ui.focusElement !is null || input.mouseButtonDown[MOUSEB_LEFT|MOUSEB_MIDDLE|MOUSEB_RIGHT])
+    if (ui.dragElement !is null) { }
+    else if (ui.focusElement !is null || input.mouseButtonDown[MOUSEB_LEFT|MOUSEB_MIDDLE|MOUSEB_RIGHT])
         return;
 
     IntVector2 pos = ui.cursor.position;
@@ -1370,6 +1373,28 @@ void ViewMouseMove()
 void ViewMouseClick()
 {
     ViewRaycast(true);
+}
+
+void ViewMouseClickEnd()
+{
+    // checks to close open popup windows
+    IntVector2 pos = ui.cursorPosition;
+    if (contextMenu !is null && contextMenu.enabled)
+    {
+        if (contextMenuActionWaitFrame)
+            contextMenuActionWaitFrame = false;
+        else
+        {
+            if (!contextMenu.IsInside(pos, true))
+                CloseContextMenu();
+        }
+    }
+    if (quickMenu !is null && quickMenu.enabled)
+    {
+        bool enabled = quickMenu.IsInside(pos, true);
+        quickMenu.enabled = enabled;
+        quickMenu.visible = enabled;
+    }
 }
 
 void ViewRaycast(bool mouseClick)
@@ -1607,6 +1632,22 @@ Vector3 SelectedNodesCenterPoint()
         return centerPoint;
 }
 
+Vector3 GetMouse3DPosition()
+{  
+    IntVector2 pos = ui.cursorPosition;
+    Ray cameraRay = camera.GetScreenRay(float(pos.x) / graphics.width, float(pos.y) / graphics.height);
+    Vector3 res = cameraNode.position + cameraRay.direction * Vector3(0, 0, newNodeDistance);
+
+    if (ui.HasModalElement())
+        return res;
+
+    if (IsGizmoSelected())
+        return res;
+
+    return res;
+}
+
+
 Vector3 GetScreenCollision(IntVector2 pos)
 {
     Ray cameraRay = camera.GetScreenRay(float(pos.x) / activeViewport.viewport.rect.width, float(pos.y) / activeViewport.viewport.rect.height);
@@ -1643,6 +1684,19 @@ Vector3 GetScreenCollision(IntVector2 pos)
     }
 
     return res;
+}
+
+Drawable@ GetDrawableAtMousePostion()
+{
+    IntVector2 pos = ui.cursorPosition;
+    Ray cameraRay = camera.GetScreenRay(float(pos.x) / activeViewport.viewport.rect.width, float(pos.y) / activeViewport.viewport.rect.height);
+
+    if (editorScene.octree is null)
+        return null;
+
+    RayQueryResult result = editorScene.octree.RaycastSingle(cameraRay, RAY_TRIANGLE, camera.farClip, DRAWABLE_GEOMETRY, 0x7fffffff);
+
+    return result.drawable;
 }
 
 void HandleBeginViewUpdate(StringHash eventType, VariantMap& eventData)
@@ -1701,4 +1755,3 @@ void HandleEndViewRender(StringHash eventType, VariantMap& eventData)
         }
     }
 }
-
