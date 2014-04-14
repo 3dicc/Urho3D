@@ -61,8 +61,8 @@ public:
     virtual bool OnDragDropFinish(UIElement* source);
     /// React to a key press.
     virtual void OnKey(int key, int buttons, int qualifiers);
-    /// React to a key press translated to a character.
-    virtual void OnChar(unsigned c, int buttons, int qualifiers);
+    /// React to text input event.
+    virtual void OnTextInput(const String& text, int buttons, int qualifiers);
 
     /// Set text.
     void SetText(const String& text);

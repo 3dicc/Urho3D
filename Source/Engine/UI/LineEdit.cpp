@@ -410,7 +410,7 @@ void LineEdit::OnKey(int key, int buttons, int qualifiers)
         UpdateCursor();
 }
 
-void LineEdit::OnChar(unsigned c, int buttons, int qualifiers)
+void LineEdit::OnTextInput(const String& text, int buttons, int qualifiers)
 {
     if (!editable_)
         return;
@@ -426,24 +426,21 @@ void LineEdit::OnChar(unsigned c, int buttons, int qualifiers)
     
     VariantMap& eventData = GetEventDataMap();
     eventData[P_ELEMENT] = this;
-    eventData[P_CHAR] = c;
+    eventData[P_TEXT] = text;
     eventData[P_BUTTONS] = buttons;
     eventData[P_QUALIFIERS] = qualifiers;
-    SendEvent(E_CHARENTRY, eventData);
-    c = eventData[P_CHAR].GetUInt();
-    
-    if (c >= 0x20 && (!maxLength_ || line_.LengthUTF8() < maxLength_))
-    {
-        String charStr;
-        charStr.AppendUTF8(c);
+    SendEvent(E_TEXTENTRY, eventData);
 
+    const String newText = eventData[P_TEXT].GetString().SubstringUTF8(0);
+    if (!newText.Empty() && (!maxLength_ || line_.LengthUTF8() + newText.LengthUTF8() <= maxLength_))
+    {
         if (!text_->GetSelectionLength())
         {
             if (cursorPosition_ == line_.LengthUTF8())
-                line_ += charStr;
+                line_ += newText;
             else
-                line_ = line_.SubstringUTF8(0, cursorPosition_) + charStr + line_.SubstringUTF8(cursorPosition_);
-            ++cursorPosition_;
+                line_ = line_.SubstringUTF8(0, cursorPosition_) + newText + line_.SubstringUTF8(cursorPosition_);
+            cursorPosition_ += newText.LengthUTF8();
         }
         else
         {
@@ -451,10 +448,10 @@ void LineEdit::OnChar(unsigned c, int buttons, int qualifiers)
             unsigned start = text_->GetSelectionStart();
             unsigned length = text_->GetSelectionLength();
             if (start + length < line_.LengthUTF8())
-                line_ = line_.SubstringUTF8(0, start) + charStr + line_.SubstringUTF8(start + length);
+                line_ = line_.SubstringUTF8(0, start) + newText + line_.SubstringUTF8(start + length);
             else
-                line_ = line_.SubstringUTF8(0, start) + charStr;
-            cursorPosition_ = start + 1;
+                line_ = line_.SubstringUTF8(0, start) + newText;
+            cursorPosition_ = start + newText.LengthUTF8();
         }
         changed = true;
     }
