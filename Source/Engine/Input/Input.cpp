@@ -854,6 +854,10 @@ void Input::HandleSDLEvent(void* sdlEvent)
                 textInputEventData[P_BUTTONS] = mouseButtonDown_;
                 textInputEventData[P_QUALIFIERS] = GetQualifiers();
                 SendEvent(E_TEXTINPUT, textInputEventData);
+ #ifdef WIN32
+                SDL_StopTextInput();
+                SDL_StartTextInput();
+#endif
             }
         }
         break;
